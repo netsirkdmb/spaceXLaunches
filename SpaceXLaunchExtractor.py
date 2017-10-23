@@ -30,7 +30,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 # scope for read/write calendar
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 # authorize scope using credentials
-credentials = ServiceAccountCredentials.from_json_keyfile_name('SpaceXLaunches-1441245ff27e.json', scopes=SCOPES)
+credentials = ServiceAccountCredentials.from_json_keyfile_name('SpaceXLaunches-54ed254ee8b1.json', scopes=SCOPES)
 http_auth = credentials.authorize(Http())
 # create service for reading and writing to calendar with authorization obtained in above code
 service = build('calendar', 'v3', http=http_auth)
@@ -89,7 +89,7 @@ def getSpaceXLaunches():
             launchInfo["launchTime"] = matches.groups()[0]
             launchInfo["launchSite"] = matches.groups()[1]
             missdescrip = launch.next_sibling.next_sibling.next_sibling.next_sibling.text
-            launchInfo["missdescrip"] = missdescrip
+            launchInfo["missdescrip"] = missdescrip + " www.spacex.com/webcast"
             # strip "NET" from launchdate if it is present and add it to the beginning of
             # missdescrip so that the information is not lost, but it does not impact date
             # parsing later
@@ -185,8 +185,8 @@ def createGoogleCalendarEvent():
         e = service.events().insert(calendarId='jtt4kee7pdt4sg9bpj3basjpkk@group.calendar.google.com', body=theEvent).execute()
 
     #Error Printing for Debugging
-    # print("\n\n*******ERROR*******")
-    # pprint(errors)
+    print("\n\n*******ERROR*******")
+    pprint(errors)
 
 def main():
     # adds SpaceX launches to the SpaceXLaunch calendar
