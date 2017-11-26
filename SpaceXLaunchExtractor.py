@@ -72,7 +72,7 @@ def getSpaceXLaunches():
     # create a list of "launches" where a launch is any dif element whose parent element
     # has class="entry-content"
     launches = soup.select(".entry-content > div")
-
+    pprint(len(launches))
     # iterate through "launches"
     # "launches" is in quotes because a launch consists of data from three sibling divs
     # each launch starts with a div whose class="datename" followed by "missiondata"
@@ -85,6 +85,7 @@ def getSpaceXLaunches():
             launchInfo["mission"] = launch.select_one(".mission").string
             # prepare and parse missiondata text with regex
             missiondata = launch.next_sibling.next_sibling.text.replace('\n', ':')
+            print(missiondata)
             matches = dateLocationRegex.match(missiondata)
             launchInfo["launchTime"] = matches.groups()[0]
             launchInfo["launchSite"] = matches.groups()[1]
@@ -96,12 +97,16 @@ def getSpaceXLaunches():
             if "NET" in launchInfo["launchdate"]:
                 launchInfo["missdescrip"] = launchInfo["launchdate"] + ": " + missdescrip
                 launchInfo["launchdate"] = str(launchInfo["launchdate"].replace("NET", "")).strip()
-
+        else:
+            pprint("**** not a SpaceX launch: " + str(launch))
         # if this was a SpaceX launch, give the dictionary to the next function with yield
         # this saves memory by not creating a giant all at once and instead processing each
         # item as it is created
         if not isEmpty(launchInfo):
             yield launchInfo
+
+def createCorrectDatetime(theDate, theYear, startDatetime = None):
+    pass
 
 def createGoogleCalendarEvent():
     """This function parses the launchInfo for the SpaceX launch into an event to add to a Google calendar
@@ -127,18 +132,28 @@ def createGoogleCalendarEvent():
         splitDate = launch["launchdate"].split(".")
         # if the length of splitDate is not 2, the month may not be abbreviated or
         # the date might not be specific
-        if len(splitDate) != 2:
+        wrongDateLength = len(splitDate) != 2
+        if wrongDateLength:
             # try splitting the date on a " "
             splitDate = launch["launchdate"].split(" ")
             # if the length of splitDate is still not equal to 2, the date is not valid
             # if the length is equal to 2, but splitDate[1] is not all digits or 
             # the length of splitDate[1] is greater than 2, then this is not a valid date
-            if len(splitDate) != 2 or not splitDate[1].isdigit() or len(splitDate[1]) > 2:
-                errors.append(launch)
-                continue
+            # note that the date may still be valid if it is something like "April 2/3"
+            wrongDateLength = len(splitDate) != 2
+            if wrongDateLength or not splitDate[1].isdigit() or len(splitDate[1]) > 2:
+                # make sure the number portion of the date does not have a "/", which would make it a valid date
+                if wrongDateLength or "/" not in splitDate[1]:
+                    errors.append(launch)
+                    continue
             # if this is a valid date, add a " " before the number in splitDate[1]
             # so that it matches the format of the dates that were split on a "."
             splitDate[1] = " " + splitDate[1]
+        
+        # if date number is in #/# format, figure out what to do
+        if "/" in splitDate[1]:
+            pass
+
         # join the two strings in splitDate back together to make a date string
         # take only the first 3 characters of splitDate[0] to match the abbreviations
         # that arrow uses for months
@@ -153,36 +168,36 @@ def createGoogleCalendarEvent():
 
         # concatenate the launchdate with the launchTime to get a string that arrow
         # can parse to a datetime
-        startDatetimeString = theDate + " " + launch["launchTime"]
-        startDatetime = arrow.get(startDatetimeString, 'MMM D HHmm')
-        # add the correct year to startDatetime
-        startDatetime = startDatetime.replace(year = theYear)
-        # if startDatetime is less than previousDate, our list of launches has wrapped
-        # to the next year
-        if startDatetime < previousDate:
-            # correct the year for startDatetime
-            theYear = theYear + 1
-            startDatetime = startDatetime.replace(year = theYear)
-        # set previousDate to the startDatetime for this launch
-        previousDate = startDatetime
+        # startDatetimeString = theDate + " " + launch["launchTime"]
+        # startDatetime = arrow.get(startDatetimeString, 'MMM D HHmm')
+        # # add the correct year to startDatetime
+        # startDatetime = startDatetime.replace(year = theYear)
+        # # if startDatetime is less than previousDate, our list of launches has wrapped
+        # # to the next year
+        # if startDatetime < previousDate:
+        #     # correct the year for startDatetime
+        #     theYear = theYear + 1
+        #     startDatetime = startDatetime.replace(year = theYear)
+        # # set previousDate to the startDatetime for this launch
+        # previousDate = startDatetime
 
-        # if launchTime is TBD, the start should only have a date to create an all-day
-        # event, otherwise a datetime is used for a specific launch time
-        if allday:
-            theEvent["start"] = {"date": startDatetime.format("YYYY-MM-DD")}
-        else:
-            theEvent["start"] = {"dateTime": startDatetime.isoformat()}
+        # # if launchTime is TBD, the start should only have a date to create an all-day
+        # # event, otherwise a datetime is used for a specific launch time
+        # if allday:
+        #     theEvent["start"] = {"date": startDatetime.format("YYYY-MM-DD")}
+        # else:
+        #     theEvent["start"] = {"dateTime": startDatetime.isoformat()}
         
-        # the end of the event is the same as the start
-        # ******* may consider changing this to reflect the launch window if present ********
-        theEvent["end"] = theEvent["start"]
+        # # the end of the event is the same as the start
+        # # ******* may consider changing this to reflect the launch window if present ********
+        # theEvent["end"] = theEvent["start"]
 
         # print the events that are being added to the calendar to the console for debugging
         print("\n\n")
         pprint(theEvent)
         
         # add the event to the calendar
-        e = service.events().insert(calendarId='jtt4kee7pdt4sg9bpj3basjpkk@group.calendar.google.com', body=theEvent).execute()
+        # e = service.events().insert(calendarId='jtt4kee7pdt4sg9bpj3basjpkk@group.calendar.google.com', body=theEvent).execute()
 
     #Error Printing for Debugging
     print("\n\n*******ERROR*******")
