@@ -8,6 +8,7 @@ SpaceXLaunches-54ed254ee8b1.json
 *.exe
 *.o
 *.so
+*.pyc
 
 # Packages #
 ############

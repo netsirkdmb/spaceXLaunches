@@ -61,25 +61,26 @@ def getSpaceXLaunches():
     """This function gets the info for the SpaceX launches and adds them to a list of dictionaries
     for each launch
     """
-    # regex to separate the launchTime string from the launchSite string
-    dateLocationRegex = re.compile("^.*?:\s*(?:Approx\.\s*)?(TBD|[\d-]+)(?: GMT)?.*:\s(.*)")
 
     # get the html from the spaceflightnow launch schedule website
     url = "https://spaceflightnow.com/launch-schedule/"
     response = requests.get(url)
 
-    parseLaunchSchedule(response.text)
+    return parseLaunchSchedule(response.text)
 
 def extractLaunchesFromSoup(soup):
-    return soup.select(".entry-content > div")
+    return soup.find_all("div", class_=["datename", "missiondata", "missdescrip"])
+    #return soup.select(".entry-content > div")
 
 def parseLaunchSchedule(html):
+    # regex to separate the launchTime string from the launchSite string
+    dateLocationRegex = re.compile("^.*?:\s*(?:Approx\.\s*)?(TBD|[\d-]+)(?: GMT)?.*:\s(.*)")
+
     # create BeautifulSoup parser for html
     soup = BeautifulSoup(html, 'html.parser')
     # create a list of "launches" where a launch is any dif element whose parent element
     # has class="entry-content"
     launches = extractLaunchesFromSoup(soup)
-    pprint(len(launches))
     # iterate through "launches"
     # "launches" is in quotes because a launch consists of data from three sibling divs
     # each launch starts with a div whose class="datename" followed by "missiondata"
