@@ -67,11 +67,18 @@ def getSpaceXLaunches():
     # get the html from the spaceflightnow launch schedule website
     url = "https://spaceflightnow.com/launch-schedule/"
     response = requests.get(url)
+
+    parseLaunchSchedule(response.text)
+
+def extractLaunchesFromSoup(soup):
+    return soup.select(".entry-content > div")
+
+def parseLaunchSchedule(html):
     # create BeautifulSoup parser for html
-    soup = BeautifulSoup(response.text, 'html.parser')
+    soup = BeautifulSoup(html, 'html.parser')
     # create a list of "launches" where a launch is any dif element whose parent element
     # has class="entry-content"
-    launches = soup.select(".entry-content > div")
+    launches = extractLaunchesFromSoup(soup)
     pprint(len(launches))
     # iterate through "launches"
     # "launches" is in quotes because a launch consists of data from three sibling divs
