@@ -42,18 +42,23 @@ def isEmpty(anyStructure):
     else:
         return True
 
+def containsFalcon(missionText):
+    if "Falcon" in missionText or "falcon" in missionText:
+        return True
+    else:
+        return False
+
 def isSpaceXLaunch(launch):
     """This function returns whether or not a launch is a SpaceX launch based on the mission
     text containing the word 'Falcon'
     """
     # find the html tag with class="datename"
     if launch["class"] == ["datename"]:
-        # if "Falcon" is part of the text in the tag with class="mission",
-        # this is a SpaceX launch
-        if "Falcon" in launch.select_one(".mission").string:
-            return True
-        else:
-            return False
+        missionText = launch.select_one(".mission").string
+        # if "Falcon" or "falcon" is part of the text in the tag with class="mission",
+        # this is a SpaceX launch, return true
+        return containsFalcon(missionText)
+    # html tag isn't class="datename"
     else:
         return False
 
@@ -61,16 +66,15 @@ def getSpaceXLaunches():
     """This function gets the info for the SpaceX launches and adds them to a list of dictionaries
     for each launch
     """
-
     # get the html from the spaceflightnow launch schedule website
     url = "https://spaceflightnow.com/launch-schedule/"
     response = requests.get(url)
-
+    # return the parsed SpaceX launches
     return parseLaunchSchedule(response.text)
 
 def extractLaunchesFromSoup(soup):
+    """This function gets all of the divs with launch info out of the html"""
     return soup.find_all("div", class_=["datename", "missiondata", "missdescrip"])
-    #return soup.select(".entry-content > div")
 
 def parseLaunchSchedule(html):
     # regex to separate the launchTime string from the launchSite string
@@ -93,7 +97,6 @@ def parseLaunchSchedule(html):
             launchInfo["mission"] = launch.select_one(".mission").string
             # prepare and parse missiondata text with regex
             missiondata = launch.next_sibling.next_sibling.text.replace('\n', ':')
-            print(missiondata)
             matches = dateLocationRegex.match(missiondata)
             launchInfo["launchTime"] = matches.groups()[0]
             launchInfo["launchSite"] = matches.groups()[1]
@@ -113,10 +116,27 @@ def parseLaunchSchedule(html):
         if not isEmpty(launchInfo):
             yield launchInfo
 
-def createCorrectDatetime(theDate, theYear, startDatetime = None):
-    pass
+def createCorrectDatetime(datetimeString, theYear, previousDate, startDatetime = None):
+    # convert the datetime string to a datetime
+    theDatetime = arrow.get(datetimeString, 'MMM D HHmm')
+    # add the correct year to startDatetime
+    theDatetime = theDatetime.replace(year = theYear)
 
-def createGoogleCalendarEvent():
+    # if this is an end time, make sure the day is correct if the launch window spans a date change
+    if startDatetime != None and theDatetime < startDatetime:
+        theDatetime = theDatetime.shift(days=+1)
+    # if startDatetime is less than previousDate, our list of launches has wrapped
+    # to the next year
+    elif theDatetime < previousDate:
+        # correct the year for startDatetime
+        theYear = theYear + 1
+        theDatetime = theDatetime.replace(year = theYear)
+    # set previousDate to the startDatetime for this launch
+    previousDate = theDatetime
+
+    return theDatetime, previousDate, theYear
+
+def main():
     """This function parses the launchInfo for the SpaceX launch into an event to add to a Google calendar
     and adds the event to a Google calendar
     """
@@ -160,7 +180,8 @@ def createGoogleCalendarEvent():
         
         # if date number is in #/# format, figure out what to do
         if "/" in splitDate[1]:
-            pass
+            errors.append(launch)
+            continue
 
         # join the two strings in splitDate back together to make a date string
         # take only the first 3 characters of splitDate[0] to match the abbreviations
@@ -173,32 +194,32 @@ def createGoogleCalendarEvent():
         if launch["launchTime"] == "TBD":
             launch["launchTime"] = "0000"
             allday = True
+        
+        # set start and end times for launch window
+        launchWindow = launch["launchTime"].split("-")
+        startTime = launchWindow[0]
+        if len(launchWindow) == 2:
+            endTime = launchWindow[1]
+        else:
+            endTime = startTime
 
         # concatenate the launchdate with the launchTime to get a string that arrow
         # can parse to a datetime
-        # startDatetimeString = theDate + " " + launch["launchTime"]
-        # startDatetime = arrow.get(startDatetimeString, 'MMM D HHmm')
-        # # add the correct year to startDatetime
-        # startDatetime = startDatetime.replace(year = theYear)
-        # # if startDatetime is less than previousDate, our list of launches has wrapped
-        # # to the next year
-        # if startDatetime < previousDate:
-        #     # correct the year for startDatetime
-        #     theYear = theYear + 1
-        #     startDatetime = startDatetime.replace(year = theYear)
-        # # set previousDate to the startDatetime for this launch
-        # previousDate = startDatetime
+        startDatetimeString = theDate + " " + startTime
+        endDatetimeString = theDate + " " + endTime
 
-        # # if launchTime is TBD, the start should only have a date to create an all-day
-        # # event, otherwise a datetime is used for a specific launch time
-        # if allday:
-        #     theEvent["start"] = {"date": startDatetime.format("YYYY-MM-DD")}
-        # else:
-        #     theEvent["start"] = {"dateTime": startDatetime.isoformat()}
-        
-        # # the end of the event is the same as the start
-        # # ******* may consider changing this to reflect the launch window if present ********
-        # theEvent["end"] = theEvent["start"]
+        # correct the datetimes
+        startDatetime, previousDate, theYear = createCorrectDatetime(startDatetimeString, theYear, previousDate)
+        endDatetime, previousDate, theYear = createCorrectDatetime(endDatetimeString, theYear, previousDate, startDatetime)
+
+        # if launchTime is TBD, the start should only have a date to create an all-day
+        # event, otherwise a datetime is used for a specific launch time
+        if allday:
+            theEvent["start"] = {"date": startDatetime.format("YYYY-MM-DD")}
+            theEvent["end"] = theEvent["start"]
+        else:
+            theEvent["start"] = {"dateTime": startDatetime.isoformat()}
+            theEvent["end"] = {"dateTime": endDatetime.isoformat()}
 
         # print the events that are being added to the calendar to the console for debugging
         print("\n\n")
@@ -210,10 +231,6 @@ def createGoogleCalendarEvent():
     #Error Printing for Debugging
     print("\n\n*******ERROR*******")
     pprint(errors)
-
-def main():
-    # adds SpaceX launches to the SpaceXLaunch calendar
-    createGoogleCalendarEvent()
 
 if __name__ == "__main__":
     main()
