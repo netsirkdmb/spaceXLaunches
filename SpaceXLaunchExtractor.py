@@ -30,10 +30,10 @@ from oauth2client.service_account import ServiceAccountCredentials
 # scope for read/write calendar
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 # authorize scope using credentials
-credentials = ServiceAccountCredentials.from_json_keyfile_name('SpaceXLaunches-54ed254ee8b1.json', scopes=SCOPES)
-http_auth = credentials.authorize(Http())
-# create service for reading and writing to calendar with authorization obtained in above code
-service = build('calendar', 'v3', http=http_auth)
+# credentials = ServiceAccountCredentials.from_json_keyfile_name('SpaceXLaunches-54ed254ee8b1.json', scopes=SCOPES)
+# http_auth = credentials.authorize(Http())
+# # create service for reading and writing to calendar with authorization obtained in above code
+# service = build('calendar', 'v3', http=http_auth)
 
 def isEmpty(anyStructure):
     """This function returns whether or not a structure such as a list is empty"""
@@ -43,6 +43,9 @@ def isEmpty(anyStructure):
         return True
 
 def containsFalcon(missionText):
+    """This function returns whether or not the missionText contains falcon (case
+    insensitive) to figure out if a launch is a SpaceX launch or not.
+    """
     if "Falcon" in missionText or "falcon" in missionText:
         return True
     else:
@@ -109,8 +112,8 @@ def parseLaunchSchedule(html):
             if "NET" in launchInfo["launchdate"]:
                 launchInfo["missdescrip"] = launchInfo["launchdate"] + ": " + missdescrip
                 launchInfo["launchdate"] = str(launchInfo["launchdate"].replace("NET ", "")).strip()
-        else:
-            pprint("**** not a SpaceX launch: " + str(launch))
+        # else:
+            # pprint("**** not a SpaceX launch: " + str(launch))
         # if this was a SpaceX launch, give the dictionary to the next function with yield
         # this saves memory by not creating a giant all at once and instead processing each
         # item as it is created
@@ -118,8 +121,9 @@ def parseLaunchSchedule(html):
             yield launchInfo
 
 def splitLaunchDate(launchDate):
-    """checks if launchDate parses into a month and a day, or something else of length 2 and returns true, plus the list of strings or
-    false plus an empty list"""
+    """checks if launchDate parses into a month and a day, or something else of length 2 and returns list of strings, 
+    else returns None
+    """
 
     # remove the "." from the date if the month is abbreviated
     splitDate = launchDate.split(".")
@@ -133,9 +137,8 @@ def splitLaunchDate(launchDate):
         wrongDateLength = len(splitDate) != 2
         if wrongDateLength:
             return None
-        # if this is a valid date length, add a " " before the second part of splitDate
-        # so that it matches the format of the dates that were split on a "."
-        splitDate[1] = " " + splitDate[1]
+    # remove leading and trailing whitespace from day string
+    splitDate[1] = splitDate[1].strip()
     return splitDate
 
 def checkMonth(theMonth):
@@ -145,8 +148,14 @@ def checkMonth(theMonth):
         return theMonth
     return None
 
-#######TODO
-def checkDay(theDay, launchTime):
+def checkDay(theDay):
+    if theDay.isdigit() and len(theDay) <= 2:
+        return theDay
+    elif "/" in theDay:
+        splitDay = theDay.split("/")
+        theDay = splitDay[1]
+        if theDay.isdigit() and len(theDay) <= 2:
+            return theDay
     return None
 
 def createCorrectDatetime(datetimeString, theYear, previousDate, startDatetime = None):
@@ -202,7 +211,7 @@ def main():
             errors.append(launch)
             continue
 
-        theDay = checkDay(splitDate[1], launch["launchTime"])
+        theDay = checkDay(splitDate[1])
 
         if not theDay:
             errors.append(launch)
