@@ -202,7 +202,7 @@ def main():
             errors.append(launch)
             continue
 
-        theDay = checkDate(splitDate[1], launch["launchTime"])
+        theDay = checkDay(splitDate[1], launch["launchTime"])
 
         if not theDay:
             errors.append(launch)
