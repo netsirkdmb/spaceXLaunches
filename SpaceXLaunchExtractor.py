@@ -77,6 +77,7 @@ def extractLaunchesFromSoup(soup):
     return soup.find_all("div", class_=["datename", "missiondata", "missdescrip"])
 
 def parseLaunchSchedule(html):
+    """This function parses the html to create a launch with all of the appropriate info"""
     # regex to separate the launchTime string from the launchSite string
     dateLocationRegex = re.compile("^.*?:\s*(?:Approx\.\s*)?(TBD|[\d-]+)(?: GMT)?.*:\s(.*)")
 
@@ -107,7 +108,7 @@ def parseLaunchSchedule(html):
             # parsing later
             if "NET" in launchInfo["launchdate"]:
                 launchInfo["missdescrip"] = launchInfo["launchdate"] + ": " + missdescrip
-                launchInfo["launchdate"] = str(launchInfo["launchdate"].replace("NET", "")).strip()
+                launchInfo["launchdate"] = str(launchInfo["launchdate"].replace("NET ", "")).strip()
         else:
             pprint("**** not a SpaceX launch: " + str(launch))
         # if this was a SpaceX launch, give the dictionary to the next function with yield
@@ -115,6 +116,38 @@ def parseLaunchSchedule(html):
         # item as it is created
         if not isEmpty(launchInfo):
             yield launchInfo
+
+def splitLaunchDate(launchDate):
+    """checks if launchDate parses into a month and a day, or something else of length 2 and returns true, plus the list of strings or
+    false plus an empty list"""
+
+    # remove the "." from the date if the month is abbreviated
+    splitDate = launchDate.split(".")
+    # if the length of splitDate is not 2, the month may not be abbreviated or
+    # the date might not be specific
+    wrongDateLength = len(splitDate) != 2
+    if wrongDateLength:
+        # try splitting the date on a " "
+        splitDate = launchDate.split(" ")
+        # if the length of splitDate is still not equal to 2, the date is not valid
+        wrongDateLength = len(splitDate) != 2
+        if wrongDateLength:
+            return None
+        # if this is a valid date length, add a " " before the second part of splitDate
+        # so that it matches the format of the dates that were split on a "."
+        splitDate[1] = " " + splitDate[1]
+    return splitDate
+
+def checkMonth(theMonth):
+    monthList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    theMonth = theMonth[:3]
+    if theMonth in monthList:
+        return theMonth
+    return None
+
+#######TODO
+def checkDay(theDay, launchTime):
+    return None
 
 def createCorrectDatetime(datetimeString, theYear, previousDate, startDatetime = None):
     # convert the datetime string to a datetime
@@ -156,37 +189,29 @@ def main():
             'location': launch["launchSite"],
             'description': launch["missdescrip"]
         }
-        # remove the "." from the date if the month is abbreviated
-        splitDate = launch["launchdate"].split(".")
-        # if the length of splitDate is not 2, the month may not be abbreviated or
-        # the date might not be specific
-        wrongDateLength = len(splitDate) != 2
-        if wrongDateLength:
-            # try splitting the date on a " "
-            splitDate = launch["launchdate"].split(" ")
-            # if the length of splitDate is still not equal to 2, the date is not valid
-            # if the length is equal to 2, but splitDate[1] is not all digits or 
-            # the length of splitDate[1] is greater than 2, then this is not a valid date
-            # note that the date may still be valid if it is something like "April 2/3"
-            wrongDateLength = len(splitDate) != 2
-            if wrongDateLength or not splitDate[1].isdigit() or len(splitDate[1]) > 2:
-                # make sure the number portion of the date does not have a "/", which would make it a valid date
-                if wrongDateLength or "/" not in splitDate[1]:
-                    errors.append(launch)
-                    continue
-            # if this is a valid date, add a " " before the number in splitDate[1]
-            # so that it matches the format of the dates that were split on a "."
-            splitDate[1] = " " + splitDate[1]
-        
-        # if date number is in #/# format, figure out what to do
-        if "/" in splitDate[1]:
+
+        splitDate = splitLaunchDate(launch["launchdate"])
+
+        if not splitDate:
+            errors.append(launch)
+            continue
+
+        theMonth = checkMonth(splitDate[0])
+
+        if not theMonth:
+            errors.append(launch)
+            continue
+
+        theDay = checkDate(splitDate[1], launch["launchTime"])
+
+        if not theDay:
             errors.append(launch)
             continue
 
         # join the two strings in splitDate back together to make a date string
         # take only the first 3 characters of splitDate[0] to match the abbreviations
         # that arrow uses for months
-        theDate = splitDate[0][:3] + splitDate[1]
+        theDate = theMonth + " " + theDay
         
         # if the launchTime is TBD, set the launchTime to midnight and set the flag
         # for creating an all-day event
