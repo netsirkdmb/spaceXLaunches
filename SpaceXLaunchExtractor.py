@@ -2,7 +2,6 @@
 
 """
 Notes:
-- Does not handle launch windows.  Event always starts and ends at the start of the window
 - When launchtime is TBD, creates all-day event
 - If date is undetermined, adds launch to error list
 - If date is determined, adds launch to calendar and increments year to next year correctly
@@ -61,7 +60,7 @@ def isSpaceXLaunch(launch):
         # if "Falcon" or "falcon" is part of the text in the tag with class="mission",
         # this is a SpaceX launch, return true
         return containsFalcon(missionText)
-    # html tag isn't class="datename"
+    # html tag doesn't have class="datename"
     else:
         return False
 
@@ -121,10 +120,9 @@ def parseLaunchSchedule(html):
             yield launchInfo
 
 def splitLaunchDate(launchDate):
-    """checks if launchDate parses into a month and a day, or something else of length 2 and returns list of strings, 
-    else returns None
+    """This function checks if launchDate parses into a month and a day, or something else of length 2 and returns list of strings, 
+    else returns None.
     """
-
     # remove the "." from the date if the month is abbreviated
     splitDate = launchDate.split(".")
     # if the length of splitDate is not 2, the month may not be abbreviated or
@@ -142,23 +140,41 @@ def splitLaunchDate(launchDate):
     return splitDate
 
 def checkMonth(theMonth):
+    """This function makes sure the month for the launchDate is a valid month and returns the properly abrevieated month if the 
+    month is valid, else returns None.
+    """
+    # list of valid month abreviations
     monthList = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    # truncates month to correct length for abreviation
     theMonth = theMonth[:3]
+    # if the month is valid, return it
     if theMonth in monthList:
         return theMonth
+    # month is not valid
     return None
 
 def checkDay(theDay):
-    if theDay.isdigit() and len(theDay) <= 2:
+    """This function checks to make sure the day part of the launchDate is a valid date.  If it is a valid date, it is returned in the proper format 
+    with "/" character removed and the correct date chosen.  Otherwise, it returns None.
+    """
+    # if the day consists of an integer between 1 and 31 (inclusive), return the day
+    if theDay.isdigit() and int(theDay) >= 1 and int(theDay) <= 31:
         return theDay
+    # if there is a "/" character in the day (i.e. "22/23")
     elif "/" in theDay:
+        # split the string on "/" and keep the second string
         splitDay = theDay.split("/")
         theDay = splitDay[1]
-        if theDay.isdigit() and len(theDay) <= 2:
+        # check again to make sure the new day consists of an integer between 1 and 31 (inclusive), return the day
+        if theDay.isdigit() and int(theDay) >= 1 and int(theDay) <= 31:
             return theDay
+    # day is not valid
     return None
 
 def createCorrectDatetime(datetimeString, theYear, previousDate, startDatetime = None):
+    """This function increments the year or day for the launchTime to make sure that the launch is after the previous launch and the end 
+    time for a launch window is after the start time for the launch window.  This assumes that all launches are listed chronologically.
+    """
     # convert the datetime string to a datetime
     theDatetime = arrow.get(datetimeString, 'MMM D HHmm')
     # add the correct year to startDatetime
@@ -182,7 +198,6 @@ def main():
     """This function parses the launchInfo for the SpaceX launch into an event to add to a Google calendar
     and adds the event to a Google calendar
     """
-
     # list to capture launches that aren't being parsed properly for a calendar event
     errors = []
 
@@ -199,27 +214,30 @@ def main():
             'description': launch["missdescrip"]
         }
 
+        # this section starts to filter out invalid dates
+        # fiter out dates that are not valid because they consist of something other than 2 strings (i.e. "First half of 2018", "January")
         splitDate = splitLaunchDate(launch["launchdate"])
 
         if not splitDate:
             errors.append(launch)
             continue
-
+        
+        # filter out dates that are not valid because the first string is not a valid month (i.e. "Early 2018", "Late December")
         theMonth = checkMonth(splitDate[0])
 
         if not theMonth:
             errors.append(launch)
             continue
-
+        
+        # filter out dates that are not valid because the second string is not a valid day of a month, also choose the correct date from
+        # dates in the format "22/23"
         theDay = checkDay(splitDate[1])
 
         if not theDay:
             errors.append(launch)
             continue
 
-        # join the two strings in splitDate back together to make a date string
-        # take only the first 3 characters of splitDate[0] to match the abbreviations
-        # that arrow uses for months
+        # join the month and day strings together to make a date that arrow recognizes
         theDate = theMonth + " " + theDay
         
         # if the launchTime is TBD, set the launchTime to midnight and set the flag
