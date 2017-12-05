@@ -28,11 +28,13 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 # scope for read/write calendar
 SCOPES = ['https://www.googleapis.com/auth/calendar']
+# calendarId for SpaceXLaunches calendar
+CALENDAR_ID = "jtt4kee7pdt4sg9bpj3basjpkk@group.calendar.google.com"
 # authorize scope using credentials
-# credentials = ServiceAccountCredentials.from_json_keyfile_name('SpaceXLaunches-54ed254ee8b1.json', scopes=SCOPES)
-# http_auth = credentials.authorize(Http())
-# # create service for reading and writing to calendar with authorization obtained in above code
-# service = build('calendar', 'v3', http=http_auth)
+credentials = ServiceAccountCredentials.from_json_keyfile_name('SpaceXLaunches-54ed254ee8b1.json', scopes=SCOPES)
+http_auth = credentials.authorize(Http())
+# create service for reading and writing to calendar with authorization obtained in above code
+service = build('calendar', 'v3', http=http_auth)
 
 def isEmpty(anyStructure):
     """This function returns whether or not a structure such as a list is empty"""
@@ -109,7 +111,7 @@ def parseLaunchSchedule(html):
             # missdescrip so that the information is not lost, but it does not impact date
             # parsing later
             if "NET" in launchInfo["launchdate"]:
-                launchInfo["missdescrip"] = launchInfo["launchdate"] + ": " + missdescrip
+                launchInfo["missdescrip"] = launchInfo["launchdate"] + ": " + launchInfo["missdescrip"]
                 launchInfo["launchdate"] = str(launchInfo["launchdate"].replace("NET ", "")).strip()
         # else:
             # pprint("**** not a SpaceX launch: " + str(launch))
@@ -274,11 +276,21 @@ def main():
             theEvent["end"] = {"dateTime": endDatetime.isoformat()}
 
         # print the events that are being added to the calendar to the console for debugging
-        print("\n\n")
-        pprint(theEvent)
+        # print("\n\n")
+        # pprint(theEvent)
         
-        # add the event to the calendar
-        # e = service.events().insert(calendarId='jtt4kee7pdt4sg9bpj3basjpkk@group.calendar.google.com', body=theEvent).execute()
+        # add the event to the calendar or update it if an event with the same summary already exists
+        e = service.events().list(calendarId=CALENDAR_ID, q=theEvent["summary"]).execute()
+        eventToUpdate = e["items"]
+        if not isEmpty(eventToUpdate):
+            eventId = eventToUpdate[0]["id"]
+            updatedEvent = service.events().update(calendarId=CALENDAR_ID, eventId=eventId, body=theEvent).execute()
+            print("\n\nThis event was updated:")
+            pprint(updatedEvent)
+        else:
+            addedEvent = service.events().insert(calendarId=CALENDAR_ID, body=theEvent).execute()
+            print("\n\nThis event was added:")
+            pprint(addedEvent)
 
     #Error Printing for Debugging
     print("\n\n*******ERROR*******")
