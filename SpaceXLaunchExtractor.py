@@ -196,6 +196,17 @@ def createCorrectDatetime(datetimeString, theYear, previousDate, startDatetime =
 
     return theDatetime, previousDate, theYear
 
+def deleteEvent(theEvent):
+    """This function deletes an event from the calendar if it exists
+    """
+    # find the event in the calendar
+    e = service.events().list(calendarId=CALENDAR_ID, q=theEvent["summary"]).execute()
+    eventToUpdate = e["items"]
+    # if the event exists, delete it
+    if not isEmpty(eventToUpdate):
+        eventId = eventToUpdate[0]["id"]
+        service.events().delete(calendarId=CALENDAR_ID, eventId='eventId').execute()
+
 def main():
     """This function parses the launchInfo for the SpaceX launch into an event to add to a Google calendar
     and adds the event to a Google calendar
@@ -222,6 +233,7 @@ def main():
 
         if not splitDate:
             errors.append(launch)
+            deleteEvent(theEvent)
             continue
         
         # filter out dates that are not valid because the first string is not a valid month (i.e. "Early 2018", "Late December")
@@ -229,6 +241,7 @@ def main():
 
         if not theMonth:
             errors.append(launch)
+            deleteEvent(theEvent)
             continue
         
         # filter out dates that are not valid because the second string is not a valid day of a month, also choose the correct date from
@@ -237,6 +250,7 @@ def main():
 
         if not theDay:
             errors.append(launch)
+            deleteEvent(theEvent)
             continue
 
         # join the month and day strings together to make a date that arrow recognizes
