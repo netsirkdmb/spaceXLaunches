@@ -205,7 +205,7 @@ def deleteEvent(theEvent):
     # if the event exists, delete it
     if not isEmpty(eventToUpdate):
         eventId = eventToUpdate[0]["id"]
-        service.events().delete(calendarId=CALENDAR_ID, eventId='eventId').execute()
+        service.events().delete(calendarId=CALENDAR_ID, eventId=eventId).execute()
 
 def main():
     """This function parses the launchInfo for the SpaceX launch into an event to add to a Google calendar
